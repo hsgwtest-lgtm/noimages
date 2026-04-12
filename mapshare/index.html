@@ -16,35 +16,6 @@
 html,body{height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#fff}
 #map{position:absolute;inset:0;z-index:0}
 
-/* ---------- セットアップ画面 ---------- */
-#setup-screen{
-  position:fixed;inset:0;z-index:9999;background:#fff;
-  display:flex;flex-direction:column;align-items:center;justify-content:center;
-  padding:24px;text-align:center;
-}
-#setup-screen.hidden{display:none}
-#setup-screen h1{font-size:28px;color:#1f1f1f;margin-bottom:4px}
-#setup-screen .subtitle{font-size:14px;color:#666;margin-bottom:32px}
-#setup-screen .logo{font-size:64px;margin-bottom:16px}
-.setup-card{
-  background:#f8f9fa;border-radius:16px;padding:24px;width:100%;max-width:400px;text-align:left;
-}
-.setup-card h2{font-size:16px;color:#1f1f1f;margin-bottom:16px}
-.setup-card ol{padding-left:20px;font-size:13px;color:#444;line-height:2}
-.setup-card a{color:#4285F4}
-.config-form{margin-top:20px}
-.config-form input{
-  display:block;width:100%;padding:10px 12px;margin-bottom:8px;
-  border:1px solid #ddd;border-radius:8px;font-size:14px;background:#fff;
-}
-.config-form input:focus{outline:none;border-color:#4285F4;box-shadow:0 0 0 2px rgba(66,133,244,.2)}
-.config-form button{
-  width:100%;padding:12px;border:none;border-radius:8px;
-  background:#4285F4;color:#fff;font-size:15px;font-weight:600;cursor:pointer;
-  margin-top:8px;
-}
-.config-form button:active{background:#3367d6}
-
 /* ---------- 名前入力ダイアログ ---------- */
 #name-dialog{
   position:fixed;inset:0;z-index:8888;background:rgba(0,0,0,.4);
@@ -183,29 +154,6 @@ html,body{height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFo
 </head>
 <body>
 
-<!-- ========== セットアップ画面 ========== -->
-<div id="setup-screen" class="hidden">
-  <div class="logo">📍</div>
-  <h1>MapShare</h1>
-  <p class="subtitle">位置情報をリアルタイムで共有</p>
-  <div class="setup-card">
-    <h2>Firebase設定</h2>
-    <ol>
-      <li><a href="https://console.firebase.google.com/" target="_blank" rel="noopener">Firebase Console</a> でプロジェクトを作成</li>
-      <li>Realtime Database を作成（ロケーション: asia-southeast1 推奨）</li>
-      <li>ルールを <code>{"rules":{".read":true,".write":true}}</code> に設定</li>
-      <li>プロジェクト設定 → ウェブアプリを追加 → 設定値を下に入力</li>
-    </ol>
-    <form class="config-form" id="config-form">
-      <input name="apiKey" placeholder="API Key" required autocomplete="off">
-      <input name="authDomain" placeholder="Auth Domain (例: xxx.firebaseapp.com)" required>
-      <input name="databaseURL" placeholder="Database URL (例: https://xxx.firebaseio.com)" required>
-      <input name="projectId" placeholder="Project ID" required>
-      <button type="submit">接続して開始</button>
-    </form>
-  </div>
-</div>
-
 <!-- ========== 名前入力ダイアログ ========== -->
 <div id="name-dialog" class="hidden">
   <div class="name-card">
@@ -268,9 +216,21 @@ html,body{height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFo
   const COLORS = ['#4285F4','#EA4335','#FBBC04','#34A853','#FF6D01','#46BDC6','#7B1FA2','#C2185B'];
   const STALE_MS = 5 * 60 * 1000;       // 5分で古いとみなす
   const UPDATE_INTERVAL = 3000;          // 位置送信間隔(ms)
-  const STORAGE_KEY_CONFIG = 'mapshare_firebase_config';
   const STORAGE_KEY_UID    = 'mapshare_uid';
   const STORAGE_KEY_NAME   = 'mapshare_name';
+
+  // ============================
+  // Firebase設定（固定）
+  // ============================
+  const FIREBASE_CONFIG = {
+    apiKey: "AIzaSyBTih0jX8cGl2BiU-QPMNy3B0yDLWBsQaY",
+    authDomain: "test-d2e12.firebaseapp.com",
+    databaseURL: "https://test-d2e12-default-rtdb.asia-southeast1.firebasedatabase.app",
+    projectId: "test-d2e12",
+    storageBucket: "test-d2e12.firebasestorage.app",
+    messagingSenderId: "637889472851",
+    appId: "1:637889472851:web:f3195f64fb5954936919a6"
+  };
 
   // ============================
   // ユーティリティ
@@ -303,44 +263,6 @@ html,body{height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFo
     el.classList.add('show');
     clearTimeout(el._t);
     el._t = setTimeout(() => el.classList.remove('show'), 2500);
-  }
-
-  // ============================
-  // Firebase設定の取得
-  // ============================
-  function getFirebaseConfig() {
-    const saved = localStorage.getItem(STORAGE_KEY_CONFIG);
-    if (saved) {
-      try { return JSON.parse(saved); } catch(e) {}
-    }
-    return null;
-  }
-
-  function saveFirebaseConfig(cfg) {
-    localStorage.setItem(STORAGE_KEY_CONFIG, JSON.stringify(cfg));
-  }
-
-  // ============================
-  // セットアップ画面
-  // ============================
-  function showSetup() {
-    document.getElementById('setup-screen').classList.remove('hidden');
-    document.getElementById('config-form').addEventListener('submit', function(e) {
-      e.preventDefault();
-      const fd = new FormData(this);
-      const cfg = {
-        apiKey: fd.get('apiKey').trim(),
-        authDomain: fd.get('authDomain').trim(),
-        databaseURL: fd.get('databaseURL').trim(),
-        projectId: fd.get('projectId').trim()
-      };
-      if (!cfg.apiKey || !cfg.databaseURL) {
-        showToast('API KeyとDatabase URLは必須です');
-        return;
-      }
-      saveFirebaseConfig(cfg);
-      location.reload();
-    });
   }
 
   // ============================
@@ -685,12 +607,7 @@ html,body{height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFo
   // ============================
   // エントリーポイント
   // ============================
-  const config = getFirebaseConfig();
-  if (config && config.apiKey && config.databaseURL) {
-    initApp(config);
-  } else {
-    showSetup();
-  }
+  initApp(FIREBASE_CONFIG);
 
 })();
 </script>
