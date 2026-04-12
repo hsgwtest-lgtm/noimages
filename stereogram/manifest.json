@@ -1,1 +1,39 @@
-{\n  "name": "Stereogram Generator · 立体視ジェネレーター",\n  "short_name": "Stereogram",\n  "description": "SIRDSアルゴリズムによる立体視画像ジェネレーター",\n  "start_url": "/stereo_gram/",\n  "scope": "/stereo_gram/",\n  "display": "standalone",\n  "orientation": "portrait",\n  "background_color": "#050a14",\n  "theme_color": "#050a14",\n  "icons": [\n    {\n      "src": "icon-192.png",\n      "sizes": "192x192",\n      "type": "image/png",\n      "purpose": "any"\n    },\n    {\n      "src": "icon-192.png",\n      "sizes": "192x192",\n      "type": "image/png",\n      "purpose": "maskable"\n    },\n    {\n      "src": "icon-512.png",\n      "sizes": "512x512",\n      "type": "image/png",\n      "purpose": "any"\n    },\n    {\n      "src": "icon-512.png",\n      "sizes": "512x512",\n      "type": "image/png",\n      "purpose": "maskable"\n    }\n  ],\n  "categories": ["photo", "utilities"],\n  "lang": "ja"\n}
+﻿{
+  "name": "Stereogram Generator · 立体視ジェネレーター",
+  "short_name": "Stereogram",
+  "description": "SIRDSアルゴリズムによる立体視画像ジェネレーター",
+  "start_url": "/noimages/stereogram/",
+  "scope": "/noimages/stereogram/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#050a14",
+  "theme_color": "#050a14",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "categories": ["photo", "utilities"],
+  "lang": "ja"
+}

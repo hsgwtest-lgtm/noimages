@@ -1,8 +1,9 @@
-const CACHE_NAME = 'stereogram-v1';
+const CACHE_NAME = 'stereogram-v2';
+const BASE = '/noimages/stereogram';
 const ASSETS = [
-  '/',
-  '/index.html',
-  '/manifest.json',
+  BASE + '/',
+  BASE + '/index.html',
+  BASE + '/manifest.json',
   'https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap'
 ];
 
