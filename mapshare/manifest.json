@@ -1,0 +1,19 @@
+{
+  "name": "MapShare - 位置情報共有",
+  "short_name": "MapShare",
+  "description": "URLを共有してリアルタイムで位置情報を共有するPWAアプリ",
+  "start_url": "/noimages/mapshare/",
+  "scope": "/noimages/mapshare/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#ffffff",
+  "theme_color": "#4285F4",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

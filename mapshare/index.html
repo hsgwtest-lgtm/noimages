@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="MapShare">
+<meta name="theme-color" content="#4285F4">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon.svg">
+<title>MapShare - 位置情報共有</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#fff}
+#map{position:absolute;inset:0;z-index:0}
+
+/* ---------- セットアップ画面 ---------- */
+#setup-screen{
+  position:fixed;inset:0;z-index:9999;background:#fff;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:24px;text-align:center;
+}
+#setup-screen.hidden{display:none}
+#setup-screen h1{font-size:28px;color:#1f1f1f;margin-bottom:4px}
+#setup-screen .subtitle{font-size:14px;color:#666;margin-bottom:32px}
+#setup-screen .logo{font-size:64px;margin-bottom:16px}
+.setup-card{
+  background:#f8f9fa;border-radius:16px;padding:24px;width:100%;max-width:400px;text-align:left;
+}
+.setup-card h2{font-size:16px;color:#1f1f1f;margin-bottom:16px}
+.setup-card ol{padding-left:20px;font-size:13px;color:#444;line-height:2}
+.setup-card a{color:#4285F4}
+.config-form{margin-top:20px}
+.config-form input{
+  display:block;width:100%;padding:10px 12px;margin-bottom:8px;
+  border:1px solid #ddd;border-radius:8px;font-size:14px;background:#fff;
+}
+.config-form input:focus{outline:none;border-color:#4285F4;box-shadow:0 0 0 2px rgba(66,133,244,.2)}
+.config-form button{
+  width:100%;padding:12px;border:none;border-radius:8px;
+  background:#4285F4;color:#fff;font-size:15px;font-weight:600;cursor:pointer;
+  margin-top:8px;
+}
+.config-form button:active{background:#3367d6}
+
+/* ---------- 名前入力ダイアログ ---------- */
+#name-dialog{
+  position:fixed;inset:0;z-index:8888;background:rgba(0,0,0,.4);
+  display:flex;align-items:center;justify-content:center;
+}
+#name-dialog.hidden{display:none}
+.name-card{
+  background:#fff;border-radius:16px;padding:28px 24px;width:90%;max-width:340px;text-align:center;
+}
+.name-card h2{font-size:18px;margin-bottom:4px;color:#1f1f1f}
+.name-card p{font-size:13px;color:#666;margin-bottom:20px}
+.name-card input{
+  width:100%;padding:12px;border:2px solid #e0e0e0;border-radius:10px;
+  font-size:16px;text-align:center;
+}
+.name-card input:focus{outline:none;border-color:#4285F4}
+.name-card button{
+  margin-top:16px;width:100%;padding:12px;border:none;border-radius:10px;
+  background:#4285F4;color:#fff;font-size:15px;font-weight:600;cursor:pointer;
+}
+
+/* ---------- トップバー ---------- */
+#top-bar{
+  position:fixed;top:0;left:0;right:0;z-index:1000;
+  padding:env(safe-area-inset-top,8px) 12px 8px;
+  display:flex;align-items:center;gap:8px;
+  pointer-events:none;
+}
+#top-bar>*{pointer-events:auto}
+.room-chip{
+  display:flex;align-items:center;gap:6px;
+  background:rgba(255,255,255,.92);backdrop-filter:blur(12px);
+  border-radius:20px;padding:6px 14px;font-size:13px;font-weight:600;color:#1f1f1f;
+  box-shadow:0 1px 4px rgba(0,0,0,.12);
+}
+.room-chip .dot{width:8px;height:8px;border-radius:50%;background:#34A853}
+.user-count{
+  background:rgba(255,255,255,.92);backdrop-filter:blur(12px);
+  border-radius:20px;padding:6px 12px;font-size:12px;color:#666;
+  box-shadow:0 1px 4px rgba(0,0,0,.12);
+}
+#share-btn{
+  margin-left:auto;
+  width:40px;height:40px;border-radius:50%;border:none;
+  background:rgba(255,255,255,.92);backdrop-filter:blur(12px);
+  box-shadow:0 1px 4px rgba(0,0,0,.12);
+  display:flex;align-items:center;justify-content:center;cursor:pointer;
+  color:#4285F4;font-size:18px;
+}
+
+/* ---------- FABボタン ---------- */
+.fab-group{
+  position:fixed;right:12px;bottom:calc(env(safe-area-inset-bottom,0px) + 90px);
+  z-index:1000;display:flex;flex-direction:column;gap:10px;
+}
+.fab{
+  width:44px;height:44px;border-radius:50%;border:none;
+  background:rgba(255,255,255,.92);backdrop-filter:blur(12px);
+  box-shadow:0 2px 6px rgba(0,0,0,.15);
+  display:flex;align-items:center;justify-content:center;
+  cursor:pointer;font-size:20px;
+}
+.fab:active{transform:scale(.9)}
+
+/* ---------- ボトムシート ---------- */
+#bottom-sheet{
+  position:fixed;left:0;right:0;bottom:0;z-index:1000;
+  background:rgba(255,255,255,.95);backdrop-filter:blur(12px);
+  border-radius:16px 16px 0 0;
+  padding:0 16px env(safe-area-inset-bottom,12px);
+  box-shadow:0 -2px 10px rgba(0,0,0,.08);
+  max-height:40vh;overflow-y:auto;
+  transform:translateY(0);transition:transform .3s;
+}
+#bottom-sheet .handle{
+  width:36px;height:4px;border-radius:2px;background:#ccc;
+  margin:8px auto 12px;
+}
+.user-item{
+  display:flex;align-items:center;gap:10px;padding:8px 0;
+  border-bottom:1px solid #f0f0f0;
+}
+.user-item:last-child{border:none}
+.user-avatar{
+  width:32px;height:32px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  color:#fff;font-weight:700;font-size:14px;flex-shrink:0;
+}
+.user-info{flex:1;min-width:0}
+.user-name{font-size:14px;font-weight:600;color:#1f1f1f}
+.user-meta{font-size:11px;color:#999}
+.user-me{font-size:10px;color:#4285F4;font-weight:600;margin-left:4px}
+
+/* ---------- トースト ---------- */
+#toast{
+  position:fixed;bottom:calc(env(safe-area-inset-bottom,0px) + 20px);left:50%;
+  transform:translateX(-50%) translateY(100px);
+  background:#323232;color:#fff;padding:10px 20px;border-radius:24px;
+  font-size:13px;z-index:9000;transition:transform .3s;white-space:nowrap;
+}
+#toast.show{transform:translateX(-50%) translateY(0)}
+
+/* ---------- iOS PWAインストールバナー ---------- */
+#install-banner{
+  position:fixed;bottom:0;left:0;right:0;z-index:7777;
+  background:#fff;padding:16px 16px env(safe-area-inset-bottom,16px);
+  box-shadow:0 -2px 10px rgba(0,0,0,.1);
+  display:flex;align-items:center;gap:12px;
+}
+#install-banner.hidden{display:none}
+#install-banner p{flex:1;font-size:13px;color:#444;line-height:1.4}
+#install-banner .close-banner{
+  background:none;border:none;font-size:20px;color:#999;cursor:pointer;padding:4px;
+}
+
+/* ---------- マーカー ---------- */
+.marker-pin{
+  width:36px;height:36px;border-radius:50%;
+  border:3px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.3);
+  display:flex;align-items:center;justify-content:center;
+  color:#fff;font-weight:700;font-size:14px;
+  transition:transform .3s;
+}
+.marker-pin.self{
+  box-shadow:0 0 0 4px rgba(66,133,244,.3),0 2px 6px rgba(0,0,0,.3);
+}
+.accuracy-circle{
+  border:2px solid rgba(66,133,244,.3);
+  background:rgba(66,133,244,.08);
+  border-radius:50%;
+}
+
+/* Leaflet overrides */
+.leaflet-control-attribution{font-size:9px!important;opacity:.6}
+</style>
+</head>
+<body>
+
+<!-- ========== セットアップ画面 ========== -->
+<div id="setup-screen" class="hidden">
+  <div class="logo">📍</div>
+  <h1>MapShare</h1>
+  <p class="subtitle">位置情報をリアルタイムで共有</p>
+  <div class="setup-card">
+    <h2>Firebase設定</h2>
+    <ol>
+      <li><a href="https://console.firebase.google.com/" target="_blank" rel="noopener">Firebase Console</a> でプロジェクトを作成</li>
+      <li>Realtime Database を作成（ロケーション: asia-southeast1 推奨）</li>
+      <li>ルールを <code>{"rules":{".read":true,".write":true}}</code> に設定</li>
+      <li>プロジェクト設定 → ウェブアプリを追加 → 設定値を下に入力</li>
+    </ol>
+    <form class="config-form" id="config-form">
+      <input name="apiKey" placeholder="API Key" required autocomplete="off">
+      <input name="authDomain" placeholder="Auth Domain (例: xxx.firebaseapp.com)" required>
+      <input name="databaseURL" placeholder="Database URL (例: https://xxx.firebaseio.com)" required>
+      <input name="projectId" placeholder="Project ID" required>
+      <button type="submit">接続して開始</button>
+    </form>
+  </div>
+</div>
+
+<!-- ========== 名前入力ダイアログ ========== -->
+<div id="name-dialog" class="hidden">
+  <div class="name-card">
+    <h2>表示名を設定</h2>
+    <p>マップ上で表示される名前です</p>
+    <input type="text" id="name-input" maxlength="12" placeholder="ニックネーム">
+    <button id="name-ok">はじめる</button>
+  </div>
+</div>
+
+<!-- ========== 地図 ========== -->
+<div id="map"></div>
+
+<!-- ========== トップバー ========== -->
+<div id="top-bar">
+  <div class="room-chip"><span class="dot"></span><span id="room-label">---</span></div>
+  <div class="user-count" id="user-count">0人</div>
+  <button id="share-btn" title="共有">
+    <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M4 12v7a2 2 0 002 2h12a2 2 0 002-2v-7"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+  </button>
+</div>
+
+<!-- ========== FABボタン ========== -->
+<div class="fab-group">
+  <button class="fab" id="center-fab" title="自分の位置へ">
+    <svg width="20" height="20" fill="none" stroke="#4285F4" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v4m0 12v4M2 12h4m12 0h4"/></svg>
+  </button>
+  <button class="fab" id="fit-fab" title="全員を表示">
+    <svg width="20" height="20" fill="none" stroke="#4285F4" stroke-width="2" viewBox="0 0 24 24"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>
+  </button>
+</div>
+
+<!-- ========== ボトムシート ========== -->
+<div id="bottom-sheet">
+  <div class="handle"></div>
+  <div id="user-list"></div>
+</div>
+
+<!-- ========== iOSインストールバナー ========== -->
+<div id="install-banner" class="hidden">
+  <p>ホーム画面に追加すると、フルスクリーンで快適に使えます。<br>
+    <strong>共有ボタン → ホーム画面に追加</strong></p>
+  <button class="close-banner" id="close-banner">✕</button>
+</div>
+
+<!-- ========== トースト ========== -->
+<div id="toast"></div>
+
+<!-- ========== スクリプト ========== -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script>
+(function() {
+  'use strict';
+
+  // ============================
+  // 定数
+  // ============================
+  const COLORS = ['#4285F4','#EA4335','#FBBC04','#34A853','#FF6D01','#46BDC6','#7B1FA2','#C2185B'];
+  const STALE_MS = 5 * 60 * 1000;       // 5分で古いとみなす
+  const UPDATE_INTERVAL = 3000;          // 位置送信間隔(ms)
+  const STORAGE_KEY_CONFIG = 'mapshare_firebase_config';
+  const STORAGE_KEY_UID    = 'mapshare_uid';
+  const STORAGE_KEY_NAME   = 'mapshare_name';
+
+  // ============================
+  // ユーティリティ
+  // ============================
+  function generateId(len) {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    let id = '';
+    const arr = crypto.getRandomValues(new Uint8Array(len));
+    for (let i = 0; i < len; i++) id += chars[arr[i] % chars.length];
+    return id;
+  }
+
+  function getOrCreateUid() {
+    let uid = localStorage.getItem(STORAGE_KEY_UID);
+    if (!uid) { uid = generateId(16); localStorage.setItem(STORAGE_KEY_UID, uid); }
+    return uid;
+  }
+
+  function timeAgo(ts) {
+    const sec = Math.floor((Date.now() - ts) / 1000);
+    if (sec < 10) return 'たった今';
+    if (sec < 60) return sec + '秒前';
+    if (sec < 3600) return Math.floor(sec / 60) + '分前';
+    return Math.floor(sec / 3600) + '時間前';
+  }
+
+  function showToast(msg) {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.classList.add('show');
+    clearTimeout(el._t);
+    el._t = setTimeout(() => el.classList.remove('show'), 2500);
+  }
+
+  // ============================
+  // Firebase設定の取得
+  // ============================
+  function getFirebaseConfig() {
+    const saved = localStorage.getItem(STORAGE_KEY_CONFIG);
+    if (saved) {
+      try { return JSON.parse(saved); } catch(e) {}
+    }
+    return null;
+  }
+
+  function saveFirebaseConfig(cfg) {
+    localStorage.setItem(STORAGE_KEY_CONFIG, JSON.stringify(cfg));
+  }
+
+  // ============================
+  // セットアップ画面
+  // ============================
+  function showSetup() {
+    document.getElementById('setup-screen').classList.remove('hidden');
+    document.getElementById('config-form').addEventListener('submit', function(e) {
+      e.preventDefault();
+      const fd = new FormData(this);
+      const cfg = {
+        apiKey: fd.get('apiKey').trim(),
+        authDomain: fd.get('authDomain').trim(),
+        databaseURL: fd.get('databaseURL').trim(),
+        projectId: fd.get('projectId').trim()
+      };
+      if (!cfg.apiKey || !cfg.databaseURL) {
+        showToast('API KeyとDatabase URLは必須です');
+        return;
+      }
+      saveFirebaseConfig(cfg);
+      location.reload();
+    });
+  }
+
+  // ============================
+  // ルームID管理
+  // ============================
+  function getRoomId() {
+    const params = new URLSearchParams(location.search);
+    let room = params.get('room');
+    if (room && /^[A-Za-z0-9]{4,20}$/.test(room)) return room;
+    room = generateId(6);
+    const url = new URL(location.href);
+    url.searchParams.set('room', room);
+    history.replaceState(null, '', url.toString());
+    return room;
+  }
+
+  // ============================
+  // メインアプリ
+  // ============================
+  function initApp(firebaseConfig) {
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+    const uid = getOrCreateUid();
+    const roomId = getRoomId();
+    const roomRef = db.ref('rooms/' + roomId + '/users');
+    const myRef = roomRef.child(uid);
+
+    // ルーム名表示
+    document.getElementById('room-label').textContent = 'Room: ' + roomId;
+
+    // 名前取得/入力
+    let myName = localStorage.getItem(STORAGE_KEY_NAME) || '';
+    if (!myName) {
+      showNameDialog(function(name) {
+        myName = name;
+        localStorage.setItem(STORAGE_KEY_NAME, myName);
+        startTracking();
+      });
+    }
+
+    // 地図初期化
+    const map = L.map('map', {
+      zoomControl: false,
+      attributionControl: true
+    }).setView([35.6762, 139.6503], 13);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap',
+      maxZoom: 19
+    }).addTo(map);
+
+    L.control.zoom({ position: 'topright' }).addTo(map);
+
+    // ユーザーマーカー管理
+    const markers = {};   // uid -> { marker, circle, data }
+    let colorIndex = 0;
+    const colorMap = {};  // uid -> color
+    let myLatLng = null;
+    let firstLocate = true;
+    let lastSend = 0;
+    let watchId = null;
+    let accuracyCircle = null;
+
+    function getColor(id) {
+      if (!colorMap[id]) {
+        colorMap[id] = COLORS[colorIndex % COLORS.length];
+        colorIndex++;
+      }
+      return colorMap[id];
+    }
+
+    function createMarkerIcon(color, initial, isSelf) {
+      return L.divIcon({
+        className: '',
+        html: '<div class="marker-pin' + (isSelf ? ' self' : '') + '" style="background:' + color + '">' + initial + '</div>',
+        iconSize: [36, 36],
+        iconAnchor: [18, 18],
+        popupAnchor: [0, -22]
+      });
+    }
+
+    // ---- マーカー更新 ----
+    function upsertMarker(id, data) {
+      const isSelf = id === uid;
+      const color = getColor(id);
+      const initial = (data.name || '?')[0].toUpperCase();
+      const latlng = [data.lat, data.lng];
+
+      if (markers[id]) {
+        markers[id].marker.setLatLng(latlng);
+        markers[id].marker.setIcon(createMarkerIcon(color, initial, isSelf));
+        markers[id].data = data;
+        if (markers[id].circle) markers[id].circle.setLatLng(latlng);
+      } else {
+        const marker = L.marker(latlng, {
+          icon: createMarkerIcon(color, initial, isSelf),
+          zIndexOffset: isSelf ? 1000 : 0
+        }).addTo(map);
+        marker.bindPopup('');
+        markers[id] = { marker, circle: null, data };
+      }
+
+      // ポップアップ更新
+      const popupHtml = '<strong>' + escapeHtml(data.name || '名無し') + '</strong>' +
+        (isSelf ? ' <span style="color:#4285F4;font-size:11px">(自分)</span>' : '') +
+        '<br><span style="font-size:11px;color:#888">' + timeAgo(data.timestamp) + '</span>';
+      markers[id].marker.getPopup().setContent(popupHtml);
+
+      if (isSelf) {
+        myLatLng = latlng;
+        if (data.accuracy && data.accuracy < 500) {
+          if (accuracyCircle) {
+            accuracyCircle.setLatLng(latlng).setRadius(data.accuracy);
+          } else {
+            accuracyCircle = L.circle(latlng, {
+              radius: data.accuracy,
+              className: 'accuracy-circle',
+              interactive: false
+            }).addTo(map);
+          }
+        }
+      }
+    }
+
+    function removeMarker(id) {
+      if (markers[id]) {
+        map.removeLayer(markers[id].marker);
+        if (markers[id].circle) map.removeLayer(markers[id].circle);
+        delete markers[id];
+      }
+    }
+
+    function escapeHtml(s) {
+      const d = document.createElement('div');
+      d.textContent = s;
+      return d.innerHTML;
+    }
+
+    // ---- ユーザーリスト更新 ----
+    function updateUserList() {
+      const list = document.getElementById('user-list');
+      const ids = Object.keys(markers).sort((a, b) => {
+        if (a === uid) return -1;
+        if (b === uid) return 1;
+        return (markers[b].data.timestamp || 0) - (markers[a].data.timestamp || 0);
+      });
+      document.getElementById('user-count').textContent = ids.length + '人';
+
+      list.innerHTML = ids.map(id => {
+        const d = markers[id].data;
+        const color = getColor(id);
+        const initial = (d.name || '?')[0].toUpperCase();
+        const isSelf = id === uid;
+        return '<div class="user-item" data-uid="' + id + '">' +
+          '<div class="user-avatar" style="background:' + color + '">' + initial + '</div>' +
+          '<div class="user-info">' +
+            '<div class="user-name">' + escapeHtml(d.name || '名無し') + (isSelf ? '<span class="user-me">自分</span>' : '') + '</div>' +
+            '<div class="user-meta">' + timeAgo(d.timestamp) + '</div>' +
+          '</div></div>';
+      }).join('');
+
+      // ユーザーアイテムタップで地図を移動
+      list.querySelectorAll('.user-item').forEach(el => {
+        el.addEventListener('click', function() {
+          const id = this.dataset.uid;
+          if (markers[id]) {
+            map.setView(markers[id].marker.getLatLng(), 16, { animate: true });
+            markers[id].marker.openPopup();
+          }
+        });
+      });
+    }
+
+    // ---- Firebase リスナー ----
+    roomRef.on('child_added', snap => {
+      const data = snap.val();
+      if (data && data.lat != null) {
+        upsertMarker(snap.key, data);
+        updateUserList();
+        if (firstLocate && snap.key === uid) {
+          map.setView([data.lat, data.lng], 15);
+          firstLocate = false;
+        }
+      }
+    });
+
+    roomRef.on('child_changed', snap => {
+      const data = snap.val();
+      if (data && data.lat != null) {
+        upsertMarker(snap.key, data);
+        updateUserList();
+      }
+    });
+
+    roomRef.on('child_removed', snap => {
+      removeMarker(snap.key);
+      updateUserList();
+    });
+
+    // 切断時に自分のデータを削除
+    myRef.onDisconnect().remove();
+
+    // ---- 位置情報送信 ----
+    function sendPosition(pos) {
+      const now = Date.now();
+      if (now - lastSend < UPDATE_INTERVAL) return;
+      lastSend = now;
+      myRef.set({
+        lat: pos.coords.latitude,
+        lng: pos.coords.longitude,
+        accuracy: pos.coords.accuracy,
+        timestamp: firebase.database.ServerValue.TIMESTAMP,
+        name: myName
+      });
+    }
+
+    function startTracking() {
+      if (!navigator.geolocation) {
+        showToast('位置情報がサポートされていません');
+        return;
+      }
+      watchId = navigator.geolocation.watchPosition(
+        pos => {
+          sendPosition(pos);
+          if (firstLocate) {
+            map.setView([pos.coords.latitude, pos.coords.longitude], 15);
+            firstLocate = false;
+          }
+        },
+        err => {
+          if (err.code === 1) showToast('位置情報の許可が必要です');
+          else showToast('位置情報を取得できません');
+        },
+        { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 }
+      );
+    }
+
+    if (myName) startTracking();
+
+    // ---- 古いユーザーの定期クリーニング ----
+    setInterval(() => {
+      const now = Date.now();
+      Object.keys(markers).forEach(id => {
+        if (id !== uid && markers[id].data.timestamp && (now - markers[id].data.timestamp) > STALE_MS) {
+          // 古いユーザーをFirebaseからも削除
+          roomRef.child(id).remove();
+        }
+      });
+    }, 30000);
+
+    // ---- ポップアップ時刻の定期更新 ----
+    setInterval(updateUserList, 15000);
+
+    // ---- 共有ボタン ----
+    document.getElementById('share-btn').addEventListener('click', async () => {
+      const url = location.origin + location.pathname + '?room=' + roomId;
+      if (navigator.share) {
+        try {
+          await navigator.share({ title: 'MapShare', text: '位置情報を共有しよう！', url });
+        } catch(e) {}
+      } else {
+        try {
+          await navigator.clipboard.writeText(url);
+          showToast('URLをコピーしました');
+        } catch(e) {
+          prompt('URLをコピーしてください:', url);
+        }
+      }
+    });
+
+    // ---- FABボタン ----
+    document.getElementById('center-fab').addEventListener('click', () => {
+      if (myLatLng) map.setView(myLatLng, 16, { animate: true });
+      else showToast('位置情報を取得中...');
+    });
+
+    document.getElementById('fit-fab').addEventListener('click', () => {
+      const latlngs = Object.values(markers).map(m => m.marker.getLatLng());
+      if (latlngs.length > 0) {
+        map.fitBounds(L.latLngBounds(latlngs).pad(0.3), { animate: true });
+      }
+    });
+
+    // ---- Page Visibility (バックグラウンド対策) ----
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden && myName) {
+        // フォアグラウンド復帰時に位置再送信
+        if (navigator.geolocation) {
+          navigator.geolocation.getCurrentPosition(pos => sendPosition(pos), () => {}, {
+            enableHighAccuracy: true, maximumAge: 0, timeout: 10000
+          });
+        }
+      }
+    });
+
+    // ---- ページ離脱時にクリーンアップ ----
+    window.addEventListener('beforeunload', () => {
+      myRef.remove();
+    });
+
+    // ---- iOSインストールバナー ----
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    const isStandalone = window.navigator.standalone || window.matchMedia('(display-mode: standalone)').matches;
+    if (isIOS && !isStandalone) {
+      const dismissed = sessionStorage.getItem('mapshare_banner_dismissed');
+      if (!dismissed) {
+        document.getElementById('install-banner').classList.remove('hidden');
+        document.getElementById('close-banner').addEventListener('click', () => {
+          document.getElementById('install-banner').classList.add('hidden');
+          sessionStorage.setItem('mapshare_banner_dismissed', '1');
+        });
+      }
+    }
+  }
+
+  // ============================
+  // 名前入力ダイアログ
+  // ============================
+  function showNameDialog(callback) {
+    const dialog = document.getElementById('name-dialog');
+    const input = document.getElementById('name-input');
+    const btn = document.getElementById('name-ok');
+    dialog.classList.remove('hidden');
+    input.focus();
+
+    function submit() {
+      const name = input.value.trim() || 'ゲスト' + Math.floor(Math.random() * 1000);
+      dialog.classList.add('hidden');
+      callback(name);
+    }
+    btn.addEventListener('click', submit);
+    input.addEventListener('keydown', e => { if (e.key === 'Enter') submit(); });
+  }
+
+  // ============================
+  // Service Worker登録
+  // ============================
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  }
+
+  // ============================
+  // エントリーポイント
+  // ============================
+  const config = getFirebaseConfig();
+  if (config && config.apiKey && config.databaseURL) {
+    initApp(config);
+  } else {
+    showSetup();
+  }
+
+})();
+</script>
+</body>
+</html>
