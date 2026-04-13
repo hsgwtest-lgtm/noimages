@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="PhysiX Drop">
+<meta name="theme-color" content="#1a0550">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon.svg">
+<title>PhysiX Drop</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{
+  height:100%;height:100dvh;
+  overflow:hidden;
+  background:#080820;
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
+  color:#fff;
+  user-select:none;
+}
+#wrap{
+  display:flex;flex-direction:column;
+  width:100%;height:100%;height:100dvh;
+}
+#ui{
+  display:flex;justify-content:space-evenly;align-items:center;
+  padding:8px 12px;
+  padding-top:max(8px, env(safe-area-inset-top));
+  background:rgba(0,0,0,0.55);
+  backdrop-filter:blur(6px);
+  flex-shrink:0;
+}
+.stat{text-align:center;min-width:70px}
+.stat-label{font-size:10px;opacity:0.6;letter-spacing:0.5px;text-transform:uppercase}
+.stat-value{font-size:20px;font-weight:700;line-height:1.2}
+#hint{
+  text-align:center;font-size:12px;opacity:0.5;
+  padding:3px 0;flex-shrink:0;letter-spacing:0.3px;
+}
+#canvas{
+  flex:1;
+  display:block;
+  width:100%;
+  touch-action:none;
+  cursor:crosshair;
+}
+#overlay{
+  position:fixed;inset:0;
+  display:flex;align-items:center;justify-content:center;
+  background:rgba(0,0,0,0.7);
+  z-index:10;
+}
+#overlay.hidden{display:none}
+#card{
+  background:linear-gradient(145deg,#1a0550,#0a0a30);
+  border:1px solid rgba(100,100,255,0.3);
+  border-radius:20px;
+  padding:28px 32px;
+  text-align:center;
+  min-width:240px;
+  box-shadow:0 0 40px rgba(80,80,255,0.3);
+}
+#card h2{font-size:26px;margin-bottom:6px}
+#card .sub{font-size:13px;opacity:0.65;margin-bottom:20px}
+#card .final{font-size:36px;font-weight:800;margin-bottom:4px;color:#ffcc30}
+#card .best-label{font-size:12px;opacity:0.55;margin-bottom:24px}
+#btn-restart{
+  background:linear-gradient(135deg,#7c3aed,#4f46e5);
+  color:#fff;border:none;
+  padding:13px 36px;
+  border-radius:12px;
+  font-size:17px;font-weight:600;
+  cursor:pointer;
+  transition:transform 0.1s,box-shadow 0.1s;
+  box-shadow:0 4px 20px rgba(124,58,237,0.5);
+}
+#btn-restart:active{transform:scale(0.96)}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="ui">
+    <div class="stat">
+      <div class="stat-label">スコア</div>
+      <div class="stat-value" id="el-score">0</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">ベスト</div>
+      <div class="stat-value" id="el-best">0</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">残りボール</div>
+      <div class="stat-value" id="el-balls">5</div>
+    </div>
+  </div>
+  <div id="hint">タップ / クリックでボールをドロップ</div>
+  <canvas id="canvas"></canvas>
+</div>
+
+<div id="overlay">
+  <div id="card">
+    <h2 id="card-title">PhysiX Drop</h2>
+    <div class="sub" id="card-sub">ペグを弾いてスコアを稼ごう！</div>
+    <div class="final" id="card-score"></div>
+    <div class="best-label" id="card-best"></div>
+    <button id="btn-restart" onclick="startGame()">スタート</button>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+// ── DOM refs ──────────────────────────────────────────────────────────
+const canvas    = document.getElementById('canvas');
+const ctx       = canvas.getContext('2d');
+const elScore   = document.getElementById('el-score');
+const elBest    = document.getElementById('el-best');
+const elBalls   = document.getElementById('el-balls');
+const overlay   = document.getElementById('overlay');
+const cardTitle = document.getElementById('card-title');
+const cardSub   = document.getElementById('card-sub');
+const cardScore = document.getElementById('card-score');
+const cardBest  = document.getElementById('card-best');
+
+// ── Physics constants ─────────────────────────────────────────────────
+const GRAVITY   = 0.22;   // px / frame²
+const RESTITUTION = 0.68; // bounciness
+const BALL_R    = 9;      // ball radius px
+const PEG_R     = 6;      // peg radius px
+const JITTER    = 0.35;   // random nudge on peg hit (makes it feel natural)
+const MAX_SPEED = 14;     // velocity cap
+
+// ── Game state ────────────────────────────────────────────────────────
+let W, H;
+let pegs     = [];
+let buckets  = [];
+let balls    = [];
+let particles = [];
+let score    = 0;
+let best     = 0;
+let ballsLeft = 5;
+let playing  = false;
+let aimX     = null;   // mouse/touch aim position
+
+// ── Level setup ───────────────────────────────────────────────────────
+function setupLevel() {
+  pegs    = [];
+  buckets = [];
+
+  // Peg grid (Plinko-style alternating rows)
+  const PEG_COLS = 7;
+  const PEG_ROWS = 9;
+  const padX     = W * 0.08;
+  const areaTop  = H * 0.10;
+  const areaH    = H * 0.67;
+  const stepX    = (W - padX * 2) / (PEG_COLS - 1);
+  const stepY    = areaH / (PEG_ROWS - 1);
+
+  for (let r = 0; r < PEG_ROWS; r++) {
+    const even   = r % 2 === 0;
+    const cols   = even ? PEG_COLS : PEG_COLS - 1;
+    const offset = even ? 0 : stepX / 2;
+    for (let c = 0; c < cols; c++) {
+      pegs.push({
+        x: padX + offset + c * stepX,
+        y: areaTop + r * stepY,
+        lit: 0   // flash timer on hit
+      });
+    }
+  }
+
+  // Scoring buckets at bottom
+  const N       = 7;
+  const bW      = W / N;
+  const bH      = Math.max(38, H * 0.075);
+  const bY      = H - bH;
+  const scores  = [50, 100, 200, 500, 200, 100, 50];
+  // Hue for bucket colors (green=high, red=low)
+  const hues    = [0, 22, 55, 130, 55, 22, 0];
+
+  for (let i = 0; i < N; i++) {
+    buckets.push({
+      x: i * bW, y: bY,
+      w: bW,     h: bH,
+      score: scores[i],
+      hue:   hues[i]
+    });
+  }
+}
+
+// ── Ball management ───────────────────────────────────────────────────
+function spawnBall(x) {
+  if (!playing || balls.length > 0 || ballsLeft <= 0) return;
+
+  x = Math.max(BALL_R, Math.min(W - BALL_R, x));
+  balls.push({ x, y: BALL_R + 2, vx: 0, vy: 0, trail: [], scored: false });
+  ballsLeft--;
+  elBalls.textContent = ballsLeft;
+}
+
+// ── Physics update ────────────────────────────────────────────────────
+function updateBalls() {
+  for (let i = balls.length - 1; i >= 0; i--) {
+    const b = balls[i];
+
+    // Remove scored ball after a short delay
+    if (b.scored) { balls.splice(i, 1); continue; }
+
+    // Trail history
+    b.trail.push({ x: b.x, y: b.y });
+    if (b.trail.length > 10) b.trail.shift();
+
+    // Gravity
+    b.vy += GRAVITY;
+
+    // Speed cap
+    const spd = Math.hypot(b.vx, b.vy);
+    if (spd > MAX_SPEED) { b.vx = b.vx / spd * MAX_SPEED; b.vy = b.vy / spd * MAX_SPEED; }
+
+    // Integrate position
+    b.x += b.vx;
+    b.y += b.vy;
+
+    // Wall collisions
+    if (b.x - BALL_R < 0)  { b.x = BALL_R;     b.vx =  Math.abs(b.vx) * RESTITUTION; }
+    if (b.x + BALL_R > W)  { b.x = W - BALL_R; b.vx = -Math.abs(b.vx) * RESTITUTION; }
+
+    // Peg collisions
+    for (const peg of pegs) {
+      const dx  = b.x - peg.x;
+      const dy  = b.y - peg.y;
+      const d2  = dx * dx + dy * dy;
+      const min = BALL_R + PEG_R;
+      if (d2 < min * min && d2 > 0.001) {
+        const d   = Math.sqrt(d2);
+        const nx  = dx / d;
+        const ny  = dy / d;
+        const dvn = b.vx * nx + b.vy * ny;
+
+        if (dvn < 0) {
+          // Elastic collision impulse (peg has infinite mass)
+          b.vx -= (1 + RESTITUTION) * dvn * nx;
+          b.vy -= (1 + RESTITUTION) * dvn * ny;
+          // Tiny random nudge for organic feel
+          b.vx += (Math.random() - 0.5) * JITTER;
+        }
+        // Separate overlapping bodies
+        const overlap = min - d;
+        b.x += nx * overlap;
+        b.y += ny * overlap;
+
+        // Flash peg and emit particles
+        peg.lit = 12;
+        burst(peg.x, peg.y, 4, '#88aaff');
+      }
+    }
+
+    // Bucket collision
+    let scored = false;
+    for (const bkt of buckets) {
+      if (b.y + BALL_R >= bkt.y && b.x >= bkt.x && b.x < bkt.x + bkt.w) {
+        score += bkt.score;
+        elScore.textContent = score;
+        burst(b.x, bkt.y, 22, `hsl(${bkt.hue},80%,60%)`);
+        floatText(b.x, bkt.y - 12, `+${bkt.score}`, `hsl(${bkt.hue},80%,65%)`);
+        b.scored = true;
+        scored   = true;
+        break;
+      }
+    }
+
+    // Remove if out of bounds
+    if (!scored && b.y > H + 60) balls.splice(i, 1);
+  }
+
+  // Decay peg flash timers
+  for (const peg of pegs) { if (peg.lit > 0) peg.lit--; }
+}
+
+// ── Particles ──────────────────────────────────────────────────────────
+function burst(x, y, n, color) {
+  for (let i = 0; i < n; i++) {
+    const a = Math.random() * Math.PI * 2;
+    const s = 1 + Math.random() * 3;
+    particles.push({
+      type: 'dot', x, y,
+      vx: Math.cos(a) * s, vy: Math.sin(a) * s - 1,
+      r: 1.5 + Math.random() * 2,
+      color, life: 0, maxLife: 25 + Math.random() * 20
+    });
+  }
+}
+
+function floatText(x, y, text, color) {
+  particles.push({ type: 'text', x, y, vy: -1.4, text, color, life: 0, maxLife: 60 });
+}
+
+function updateParticles() {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.life++;
+    if (p.life >= p.maxLife) { particles.splice(i, 1); continue; }
+    if (p.type === 'dot')  { p.x += p.vx; p.y += p.vy; p.vy += 0.15; }
+    else                    { p.y += p.vy; }
+  }
+}
+
+// ── Rendering ─────────────────────────────────────────────────────────
+function draw() {
+  ctx.clearRect(0, 0, W, H);
+
+  // Background
+  const bgGrad = ctx.createLinearGradient(0, 0, 0, H);
+  bgGrad.addColorStop(0, '#080820');
+  bgGrad.addColorStop(1, '#1a0530');
+  ctx.fillStyle = bgGrad;
+  ctx.fillRect(0, 0, W, H);
+
+  // Aim indicator (visible when no ball is active)
+  if (aimX !== null && playing && balls.length === 0 && ballsLeft > 0) {
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255,240,150,0.45)';
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([5, 9]);
+    ctx.beginPath();
+    ctx.moveTo(aimX, 0);
+    ctx.lineTo(aimX, H * 0.09);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Ghost ball
+    const gGrad = ctx.createRadialGradient(aimX, BALL_R + 4, 0, aimX, BALL_R + 4, BALL_R * 2.2);
+    gGrad.addColorStop(0, 'rgba(255,220,80,0.4)');
+    gGrad.addColorStop(1, 'rgba(255,220,80,0)');
+    ctx.fillStyle = gGrad;
+    ctx.beginPath();
+    ctx.arc(aimX, BALL_R + 4, BALL_R * 2.2, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = 'rgba(255,240,150,0.55)';
+    ctx.beginPath();
+    ctx.arc(aimX, BALL_R + 4, BALL_R, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  // Pegs
+  for (const peg of pegs) {
+    const lit    = peg.lit / 12;
+    const baseH  = lit > 0 ? `hsla(200,100%,75%,` : `rgba(74,122,255,`;
+    const glowR  = PEG_R * (3.5 + lit * 2);
+    const glowGrad = ctx.createRadialGradient(peg.x, peg.y, 0, peg.x, peg.y, glowR);
+    glowGrad.addColorStop(0, lit > 0 ? `rgba(150,220,255,${0.4 + lit * 0.4})` : 'rgba(80,120,255,0.22)');
+    glowGrad.addColorStop(1, 'rgba(80,120,255,0)');
+    ctx.fillStyle = glowGrad;
+    ctx.beginPath();
+    ctx.arc(peg.x, peg.y, glowR, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Peg body
+    const pegGrad = ctx.createRadialGradient(peg.x - PEG_R * 0.3, peg.y - PEG_R * 0.3, 0, peg.x, peg.y, PEG_R);
+    pegGrad.addColorStop(0, lit > 0 ? '#cceeFF' : '#8ab4ff');
+    pegGrad.addColorStop(1, lit > 0 ? '#55aacc' : '#2244cc');
+    ctx.fillStyle = pegGrad;
+    ctx.beginPath();
+    ctx.arc(peg.x, peg.y, PEG_R, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Specular highlight
+    ctx.fillStyle = `rgba(255,255,255,${0.55 + lit * 0.3})`;
+    ctx.beginPath();
+    ctx.arc(peg.x - PEG_R * 0.3, peg.y - PEG_R * 0.3, PEG_R * 0.35, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Balls
+  for (const b of balls) {
+    // Trail
+    for (let t = 0; t < b.trail.length; t++) {
+      const pt    = b.trail[t];
+      const frac  = t / b.trail.length;
+      ctx.fillStyle = `rgba(255,180,50,${frac * 0.22})`;
+      ctx.beginPath();
+      ctx.arc(pt.x, pt.y, BALL_R * frac, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Glow
+    const gGrad = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, BALL_R * 2.6);
+    gGrad.addColorStop(0, 'rgba(255,180,50,0.55)');
+    gGrad.addColorStop(1, 'rgba(255,80,0,0)');
+    ctx.fillStyle = gGrad;
+    ctx.beginPath();
+    ctx.arc(b.x, b.y, BALL_R * 2.6, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Ball body (radial gradient for 3-D look)
+    const bGrad = ctx.createRadialGradient(b.x - BALL_R * 0.3, b.y - BALL_R * 0.35, 0, b.x, b.y, BALL_R);
+    bGrad.addColorStop(0,   '#fff5d0');
+    bGrad.addColorStop(0.45,'#ffcc30');
+    bGrad.addColorStop(1,   '#e05000');
+    ctx.fillStyle = bGrad;
+    ctx.beginPath();
+    ctx.arc(b.x, b.y, BALL_R, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Buckets
+  for (const bkt of buckets) {
+    const grad = ctx.createLinearGradient(bkt.x, bkt.y, bkt.x, bkt.y + bkt.h);
+    grad.addColorStop(0, `hsl(${bkt.hue},70%,42%)`);
+    grad.addColorStop(1, `hsl(${bkt.hue},70%,22%)`);
+    ctx.fillStyle = grad;
+    ctx.fillRect(bkt.x + 1, bkt.y, bkt.w - 2, bkt.h);
+
+    ctx.strokeStyle = `hsl(${bkt.hue},80%,60%)`;
+    ctx.lineWidth   = 1.5;
+    ctx.strokeRect(bkt.x + 1, bkt.y, bkt.w - 2, bkt.h);
+
+    ctx.fillStyle    = 'rgba(255,255,255,0.9)';
+    ctx.font         = `bold ${Math.min(14, bkt.w * 0.36)}px system-ui`;
+    ctx.textAlign    = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(bkt.score, bkt.x + bkt.w / 2, bkt.y + bkt.h / 2);
+  }
+
+  // Dividers between buckets
+  ctx.strokeStyle = 'rgba(0,0,0,0.5)';
+  ctx.lineWidth   = 2;
+  for (let i = 1; i < buckets.length; i++) {
+    ctx.beginPath();
+    ctx.moveTo(buckets[i].x, buckets[i].y);
+    ctx.lineTo(buckets[i].x, H);
+    ctx.stroke();
+  }
+
+  // Particles
+  ctx.save();
+  for (const p of particles) {
+    const alpha = 1 - p.life / p.maxLife;
+    ctx.globalAlpha = alpha;
+    if (p.type === 'dot') {
+      ctx.fillStyle = p.color;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+      ctx.fill();
+    } else {
+      ctx.fillStyle    = p.color;
+      ctx.font         = 'bold 20px system-ui';
+      ctx.textAlign    = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(p.text, p.x, p.y);
+    }
+  }
+  ctx.globalAlpha = 1;
+  ctx.restore();
+}
+
+// ── Game loop ─────────────────────────────────────────────────────────
+function loop() {
+  updateBalls();
+  updateParticles();
+  draw();
+  checkGameOver();
+  requestAnimationFrame(loop);
+}
+
+function checkGameOver() {
+  if (!playing) return;
+  if (ballsLeft === 0 && balls.length === 0) {
+    playing = false;
+    const isNewBest = score > best;
+    if (isNewBest) {
+      best = score;
+      elBest.textContent = best;
+      localStorage.setItem('physix-best', best);
+    }
+    setTimeout(() => {
+      cardTitle.textContent = isNewBest ? '🎉 ハイスコア！' : 'ゲームオーバー';
+      cardSub.textContent   = '最終スコア';
+      cardScore.textContent = score;
+      cardBest.textContent  = isNewBest ? '新記録達成！' : `ベスト: ${best}`;
+      overlay.classList.remove('hidden');
+    }, 800);
+  }
+}
+
+// ── Start / reset ─────────────────────────────────────────────────────
+function startGame() {
+  score     = 0;
+  ballsLeft = 5;
+  balls     = [];
+  particles = [];
+  playing   = true;
+  elScore.textContent = '0';
+  elBalls.textContent = '5';
+  overlay.classList.add('hidden');
+  setupLevel();
+}
+
+// ── Resize ────────────────────────────────────────────────────────────
+function resize() {
+  canvas.width  = canvas.clientWidth;
+  canvas.height = canvas.clientHeight;
+  W = canvas.width;
+  H = canvas.height;
+  setupLevel();
+}
+
+// ── Input ─────────────────────────────────────────────────────────────
+function getCanvasX(e) {
+  const r = canvas.getBoundingClientRect();
+  return (e.touches ? e.touches[0].clientX : e.clientX) - r.left;
+}
+
+canvas.addEventListener('mousemove',  e => { aimX = getCanvasX(e); });
+canvas.addEventListener('mouseleave', () => { aimX = null; });
+canvas.addEventListener('click',      e => { spawnBall(getCanvasX(e)); });
+
+canvas.addEventListener('touchstart', e => { e.preventDefault(); aimX = getCanvasX(e); }, { passive: false });
+canvas.addEventListener('touchmove',  e => { e.preventDefault(); aimX = getCanvasX(e); }, { passive: false });
+canvas.addEventListener('touchend',   e => {
+  e.preventDefault();
+  if (aimX !== null) spawnBall(aimX);
+  aimX = null;
+}, { passive: false });
+
+// ── Boot ──────────────────────────────────────────────────────────────
+best = parseInt(localStorage.getItem('physix-best') || '0', 10);
+elBest.textContent = best;
+
+window.addEventListener('resize', resize);
+
+// Show start screen
+cardTitle.textContent = 'PhysiX Drop';
+cardSub.textContent   = 'ペグを弾いてスコアを稼ごう！';
+cardScore.textContent = '';
+cardBest.textContent  = best > 0 ? `ベスト: ${best}` : '';
+
+requestAnimationFrame(() => {
+  resize();
+  loop();
+});
+
+// Service worker registration
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+</script>
+</body>
+</html>
