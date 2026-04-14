@@ -1,0 +1,19 @@
+{
+  "name": "PhysiX Drop - 物理落下ゲーム",
+  "short_name": "PhysiX Drop",
+  "description": "2D物理演算を使ったPlinkoスタイルの物理ゲーム",
+  "start_url": "/noimages/physics/",
+  "scope": "/noimages/physics/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#080820",
+  "theme_color": "#1a0550",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
