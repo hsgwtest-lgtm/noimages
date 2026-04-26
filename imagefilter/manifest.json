@@ -2,7 +2,7 @@
   "name": "TealGrade",
   "short_name": "TealGrade",
   "description": "Cinematic teal shadow color grade filter for photos",
-  "start_url": "/",
+  "start_url": "./",
   "display": "standalone",
   "background_color": "#0c0c0e",
   "theme_color": "#0c0c0e",

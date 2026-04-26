@@ -251,6 +251,44 @@ body {
 
 .controls[hidden] { display: none; }
 
+/* ─── Filter Tabs ───────────────────────────────────── */
+.filter-tabs {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  padding-bottom: 2px;
+}
+
+.filter-tabs::-webkit-scrollbar { display: none; }
+
+.filter-tab {
+  flex-shrink: 0;
+  padding: 8px 16px;
+  border-radius: 100px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text-2);
+  font-family: var(--font-m);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  cursor: pointer;
+  transition: all 0.18s;
+  white-space: nowrap;
+}
+
+.filter-tab:hover {
+  border-color: var(--border-2);
+  color: var(--text-1);
+}
+
+.filter-tab.active {
+  background: var(--teal-dim);
+  border-color: rgba(0,220,200,0.35);
+  color: var(--teal);
+}
+
 /* ─── Control Panel ─────────────────────────────────── */
 .control-panel {
   background: var(--surface);
