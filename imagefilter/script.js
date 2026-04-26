@@ -48,6 +48,15 @@ function buildTealLUT(intensity) {
   return { dR, dG, dB };
 }
 
+// ──────────────────────────────────────────────────────
+// Helpers
+// ──────────────────────────────────────────────────────
+
+/** Clamp a floating-point value to the [0, 255] byte range. */
+function clampByte(val) {
+  return val > 255 ? 255 : val < 0 ? 0 : (val + 0.5) | 0;
+}
+
 const FILTERS = [
   {
     id:           'teal',
@@ -70,9 +79,9 @@ const FILTERS = [
       for (let i = 0; i < data.length; i += 4) {
         const r  = data[i], g = data[i + 1], b = data[i + 2];
         const li = (0.2126 * r + 0.7152 * g + 0.0722 * b + 0.5) | 0;
-        data[i]     = r + dR[li] > 255 ? 255 : r + dR[li] < 0 ? 0 : (r + dR[li] + 0.5) | 0;
-        data[i + 1] = g + dG[li] > 255 ? 255 : g + dG[li] < 0 ? 0 : (g + dG[li] + 0.5) | 0;
-        data[i + 2] = b + dB[li] > 255 ? 255 : b + dB[li] < 0 ? 0 : (b + dB[li] + 0.5) | 0;
+        data[i]     = clampByte(r + dR[li]);
+        data[i + 1] = clampByte(g + dG[li]);
+        data[i + 2] = clampByte(b + dB[li]);
       }
       return imageData;
     },
@@ -347,8 +356,9 @@ uploadZone.addEventListener('drop', (e) => {
 });
 
 // Open file picker on upload zone click.
-// Ignore clicks that originate from the file-picker label itself
-// to avoid opening the dialog twice (label native + programmatic).
+// Ignore clicks that originate from the file-picker label itself:
+// the label already activates the input via its `for` attribute,
+// so a second programmatic click would open a duplicate dialog.
 uploadZone.addEventListener('click', (e) => {
   if (e.target.closest('label')) return;
   fileInput.click();
