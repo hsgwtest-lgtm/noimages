@@ -3,15 +3,15 @@
  * Cache-first service worker for offline PWA support.
  */
 
-const CACHE_NAME = 'tealgrade-v1';
+const CACHE_NAME = 'tealgrade-v2';
 const PRECACHE_ASSETS = [
-  '/',
-  '/index.html',
-  '/styles.css',
-  '/script.js',
-  '/manifest.json',
-  '/icon-192.png',
-  '/icon-512.png',
+  './',
+  './index.html',
+  './styles.css',
+  './script.js',
+  './manifest.json',
+  './icon-192.png',
+  './icon-512.png',
 ];
 
 // ─── Install: precache app shell ─────────────────────
