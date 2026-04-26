@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#0c0c0e">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="TealGrade">
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <title>TealGrade</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app">
+
+    <!-- ─── Header ─────────────────────────────────────────── -->
+    <header class="header">
+      <div class="logo">
+        <span class="logo-mark">◈</span>
+        <span class="logo-text">TEAL<span class="logo-accent">GRADE</span></span>
+      </div>
+      <span class="version">v1.0</span>
+    </header>
+
+    <!-- ─── Main ───────────────────────────────────────────── -->
+    <main class="main">
+
+      <!-- Upload Zone -->
+      <div class="upload-zone" id="uploadZone" role="button" tabindex="0" aria-label="画像をアップロード">
+        <div class="upload-bg-grid"></div>
+        <div class="upload-content">
+          <div class="upload-icon" aria-hidden="true">◈</div>
+          <p class="upload-primary">画像をここにドロップ</p>
+          <p class="upload-secondary">PNG / JPG / WEBP</p>
+          <label class="btn btn-upload" for="fileInput">
+            ファイルを選択
+          </label>
+          <input type="file" id="fileInput" accept="image/*" hidden aria-label="画像ファイルを選択">
+        </div>
+      </div>
+
+      <!-- Canvas Area (hidden until image loaded) -->
+      <div class="canvas-wrapper" id="canvasWrapper" hidden>
+        <canvas id="mainCanvas" aria-label="フィルタープレビュー"></canvas>
+        <div class="canvas-overlay" id="processingOverlay" hidden aria-live="polite" aria-label="処理中">
+          <div class="spinner"></div>
+        </div>
+      </div>
+
+      <!-- Controls (hidden until image loaded) -->
+      <section class="controls" id="controls" hidden aria-label="フィルターコントロール">
+
+        <!-- Intensity Slider -->
+        <div class="control-panel">
+          <div class="control-label">
+            <span class="label-tag">TEAL INTENSITY</span>
+            <span class="label-value" id="intensityDisplay" aria-live="polite">0</span>
+          </div>
+          <div class="slider-wrap">
+            <input
+              type="range"
+              id="intensitySlider"
+              class="slider"
+              min="0" max="12" step="0.1"
+              value="0"
+              aria-label="フィルター強度"
+              aria-valuemin="0"
+              aria-valuemax="12"
+            >
+            <div class="slider-ticks" aria-hidden="true">
+              <span>0</span><span>3</span><span>6</span><span>9</span><span>12</span>
+            </div>
+          </div>
+          <div class="preset-row" aria-label="プリセット強度">
+            <button class="preset-btn" data-value="0">OFF</button>
+            <button class="preset-btn" data-value="4">4</button>
+            <button class="preset-btn" data-value="8">8</button>
+            <button class="preset-btn" data-value="12" aria-pressed="false">MAX</button>
+          </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="action-row">
+          <button class="btn btn-secondary" id="resetBtn" aria-label="強度をリセット">リセット</button>
+          <button class="btn btn-primary" id="saveBtn" aria-label="現在の画像を保存">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+              <path d="M7 1v8M3.5 5.5L7 9l3.5-3.5M1 11h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            保存
+          </button>
+        </div>
+
+        <button class="btn btn-ghost" id="newImageBtn" aria-label="別の画像を選択">
+          ← 別の画像を選択
+        </button>
+      </section>
+
+    </main><!-- /.main -->
+
+    <!-- Toast notification -->
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  </div><!-- /.app -->
+
+  <script src="script.js"></script>
+</body>
+</html>
